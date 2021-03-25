@@ -23,6 +23,12 @@
 #include <helper_cuda.h>   
 
 #include "tasks/cuda_tasks.h"
+#include "profile/nvmlPower.hpp"
+#include "profile/cupti_profiler.h"
+#include "memBench/memBench.h"
+#include "dummy/dummy.h"
+
+//#include "profile/cupti_profiler.h"
 
 int main (int argc, char **argv)
 {
@@ -97,58 +103,151 @@ int main (int argc, char **argv)
 		cudaGetDeviceProperties(&deviceProp, deviceId);	
 		printf("Working on Device %s\n", deviceProp.name);
 
+        memBench mb;
+        mb.init(deviceId);
+        mb.getChipAssignments();
+        mb.getMemoryRanges();
+        mb.writeAssignments();
+        exit(0);
+
+        nvmlAPIRun();
+
+        // Timers
+        double ProfilingTimeThreshold = 1.0; // Kernels are launched many times during this interval
+        struct timespec now;
+        double time0, time1, time2, elapsed_time = 0.0, exec_time = 0.0;
+
+        // CUPTI
+        vector<string> event_names {
+ //           "active_cycles"
+           };
+        vector<string> metric_names {
+             "l2_read_transactions",
+//             "ipc"
+            };
+//        cupti_profiler::profiler profiler(event_names, metric_names);        
+//        int passes = profiler.get_passes();
+//        std::vector<std::string> curr_metric = init_cupti_profiler( deviceId );
+//        std::string mis_metricas[2] = {"l2_read_transactions", "ipc"};
+      
         // Create task
-        ProfileMode prof = EventsProf;
+        ProfileMode prof = CUPTIProf;//CUPTIProf; //TimerProf;//EventsProf;
         CUDAtaskNames task_name = VA;
-        CKEmode mode = SYNC;
+        CKEmode cke_mode = ASYNC; 
+        MemoryRangeMode mr_mode = None;//None; //Shared;
         CUDAtask *t = createCUDATask(task_name);
         t->setPinned(true);
         t->setProfileMode(prof);
-        t->setCKEMode(mode);
+        t->setCKEMode(cke_mode);
+        t->setMRMode(mr_mode);
         vectorAddTask *vt = dynamic_cast<vectorAddTask*>(t);
-        vt->setNumElements(16*1024*1024);
+        vt->setNumElements(16*16*1024);
 
         t->allocHostMemory();
         t->dataGeneration();
+
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        printf("%lu\t%lu\tAllocating device memory\n", now.tv_sec, now.tv_nsec);
+
         t->allocDeviceMemory();
+
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        printf("%lu\t%lu\tTransfering to device\n", now.tv_sec, now.tv_nsec);
+
         t->htdTransfer();
 
         // Barrier
 		*p += 1;
 		while (*p < num_kernels); // Spin lock
 		
-        printf("Starting profiling\n");
-		// Solo original profiling
-        double ProfilingTimeThreshold = 1.0; // Kernels are launched many times during this interval
-        struct timespec now;
-        double time0, time1, time2, elapsed_time = 0.0, exec_time = 0.0;
-        unsigned long int numLaunchs = 0;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        printf("%lu\t%lu\tExecuting kernel\n", now.tv_sec, now.tv_nsec);
 
+		// Solo original profiling
+
+        unsigned long int numLaunchs = 0;
         if ( prof == TimerProf ) {
-            clock_gettime(CLOCK_REALTIME, &now);
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            time0 = (double)now.tv_sec+(double)now.tv_nsec*1e-9;
             while ( elapsed_time < ProfilingTimeThreshold ) {
-                clock_gettime(CLOCK_REALTIME, &now);
-                time0 = (double)now.tv_sec+(double)now.tv_nsec*1e-9;
+                clock_gettime(CLOCK_MONOTONIC, &now);
                 time1 = (double)now.tv_sec+(double)now.tv_nsec*1e-9;
                 t->kernelExec();
-                clock_gettime(CLOCK_REALTIME, &now);
+                clock_gettime(CLOCK_MONOTONIC, &now);
                 time2 = (double)now.tv_sec+(double)now.tv_nsec*1e-9;
                 exec_time += time2 - time1;
                 elapsed_time = time2 - time0;
                 numLaunchs++;
             }
         }
-        else
-            t->kernelExec();
+        else if ( prof == CUPTIProf ) {
+//           FILE *fp = open_metric_file( "metric_values.log" );
+//           fprintf(fp, "MetricName, EventName, Sum, TotalInstances, NumInstances, Normalized, Values, ...\n"); 
+//            for ( int i = 0; i < curr_metric.size(); i++ )
+for ( int j = 0; j < 1; j++ )
+{
+    vt->kk = j;
+//            for ( int i = 0; i < 1; i++ )
+            {
+                printf("%d", j);
+//                CUpti_EventGroupSets *passData = start_cupti_profiler( curr_metric[i].c_str() );
+//               CUpti_EventGroupSets *passData = start_cupti_profiler( mis_metricas[i].c_str() );
+//                int num_passes = passData->numSets ;
+                // advance_cupti_profiler( passData, 0 );
+                // if ( num_passes > 1 ) {
+                //     stop_cupti_profiler( false );       
+                //     printf("Ignoring metric %s because it needs %d passes\n", curr_metric[i].c_str(), num_passes);
+                // } else {
+                //     t->kernelExec();
+                //     stop_cupti_profiler( true );
+                //     printf("Max %llu\n", getMaxIdxEvent());
+                // }
+//                 profiler.start();
+//                 for ( int i = 0; i < passes; ++i )
+//                     t->kernelExec();
+//                 profiler.stop();
+//                 printf("Event Trace\n");
+//   profiler.print_event_values(std::cout);
+//   printf("Metric Trace\n");
+//   profiler.print_metric_values(std::cout);
+//   auto names = profiler.get_kernel_names();
+//   for(auto name: names) {
+//     printf("\n%s ", name.c_str());
+//     std::vector<uint64_t> inst = profiler.get_event_instances(name.c_str());
+//     printf("Instances:\n");
+//     for (auto i = inst.begin(); i != inst.end(); ++i)
+//       std::cout << "\t" << *i;
+//     }
+//     std::cout << "\n";
+  
+            }
+        }
+//            close_metric_file();
+        }
+
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        printf("%lu\t%lu\tTransfering from device\n", now.tv_sec, now.tv_nsec);
 
         t->dthTransfer();
+
+		cudaDeviceSynchronize();
         t->checkResults();
+        nvmlAPIEnd();
+
+        // const auto event_names_all = cupti_profiler::available_events(deviceId);
+        // const auto metric_names_all = cupti_profiler::available_metrics(deviceId);
+        // std::cout << "Events: " << std::endl;
+        // for (auto i = event_names_all.begin(); i != event_names_all.end(); ++i)
+        //     std::cout << "\t" << *i << std::endl;
+        // std::cout << "Metrics: " << std::endl;
+        // for (auto i = metric_names_all.begin(); i != metric_names_all.end(); ++i)
+        //     std::cout << "    " << *i << std::endl;
 
         switch(prof) {
         case NoProfile:
             break;
         case TimerProf:
-        	printf("Child %lu Kernel %lu NumLaunchs %lu Time %f TimePerKernel %f\n", (ulong) getpid(), (ulong) t->getName(), (ulong) numLaunchs, exec_time, exec_time/numLaunchs);
+        	printf("Child %lu Kernel %lu NumLaunchs %lu Time %f TimePerKernel %f us\n", (ulong) getpid(), (ulong) t->getName(), (ulong) numLaunchs, exec_time, 1000000*exec_time/numLaunchs);
             break;
         case EventsProf:
             float th = t->getHtDElapsedTime();
@@ -157,7 +256,6 @@ int main (int argc, char **argv)
             printf("HtD %f K %f DtH %f\n", th, tk, td);
             break;
         }
-		cudaDeviceSynchronize();
 		exit(0);
     }
 }

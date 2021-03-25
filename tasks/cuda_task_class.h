@@ -14,9 +14,10 @@
 
 using namespace std;
 
-typedef enum {VA=0, BS} CUDAtaskNames;
+typedef enum {VA=0, BS, MemBench, Dummy} CUDAtaskNames;
 typedef enum {NoProfile=0, TimerProf, EventsProf, CUPTIProf} ProfileMode;
 typedef enum {SYNC=0, ASYNC} CKEmode;
+typedef enum {None=0, Shared, NonShared} MemoryRangeMode;
 /**
  * @class CUDAtask
  * @brief A generic CUDA task
@@ -110,27 +111,31 @@ public:
 	virtual bool checkResults(void) = 0;
 
 	virtual void setCKEMode( CKEmode m ) {
-		mode = m;
-		if ( mode == ASYNC )
+		cke_mode = m;
+		if ( cke_mode == ASYNC )
 			cudaStreamCreate( &t_stream );
 	}
 
+	virtual void setMRMode( MemoryRangeMode m ) {
+		mr_mode = m;
+	}
+
 	virtual void htdTransfer() {
-		if ( mode == SYNC )
+		if ( cke_mode == SYNC )
 			memHostToDevice();
 		else
 			memHostToDeviceAsync( t_stream );
 	}
 
 	virtual void dthTransfer() {
-		if ( mode == SYNC )
+		if ( cke_mode == SYNC )
 			memDeviceToHost();
 		else
 			memDeviceToHostAsync( t_stream );
 	}
 
 	virtual void kernelExec() {
-		if ( mode == SYNC )
+		if ( cke_mode == SYNC )
 			launchKernel();
 		else
 			launchKernelAsync( t_stream );
@@ -140,6 +145,9 @@ public:
 	virtual void setPinned(bool p) { pinned = p;}
 	virtual void setThreadsPerBlock(int t) { threadsPerBlock = t; }
 	virtual void setBlocksPerGrid(int b) { blocksPerGrid = b; }
+
+	virtual int getThreadsPerBlock() { return threadsPerBlock; }
+	virtual int getBlocksPerGrid() { return blocksPerGrid; }
 
 	virtual void setProfileMode(ProfileMode p) {
 		if ( p == EventsProf )
@@ -186,7 +194,8 @@ protected:
 	// Task generic variables
 	CUDAtaskNames name;
 	// CUDA configuration
-	CKEmode mode; // CKE mode: SYNC or ASYNC
+	CKEmode cke_mode; // CKE mode: SYNC or ASYNC
+	MemoryRangeMode mr_mode; // Memory range mode: none, shared or unshared
 	cudaStream_t t_stream;
 	bool pinned = false; // True to request pinned memory
 	cudaError_t err; // Error code to check return values for CUDA calls

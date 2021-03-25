@@ -1,5 +1,5 @@
 /**
- * @file vectorAdd.h
+ * @file dummy.h
  * @author José María González Linares (jgl@uma.es)
  * @brief 
  * @version 0.1
@@ -17,16 +17,16 @@
 using namespace std;
 
 /**
- * @brief Vector addition task
+ * @brief Dummy task
  * 
  */
-class vectorAddTask : public CUDAtask
+class dummyTask : public CUDAtask
 {
 public:
 
-vectorAddTask();
-vectorAddTask(unsigned long n, bool p);
-~vectorAddTask();
+dummyTask();
+dummyTask(unsigned long nI, bool cb, unsigned long nE, bool mb);
+~dummyTask();
 CUDAtaskNames getName();
 
 void allocHostMemory(void);
@@ -42,34 +42,29 @@ void launchKernelAsync(cudaStream_t stream);
 void launchKernel(void);
 bool checkResults(void);
 
-void setNumElements(unsigned long n);
-unsigned long getNumElements() {return numElements;};
+void setNumElements(unsigned long n) { m_numElements = n; }
+unsigned long getNumElements() {return m_numElements;}
 
-int kk;
+void setNumIter(unsigned long n) { m_numIter = n; }
+unsigned long getNumIter() {return m_numIter;}
+
+void setCB(bool b) { m_launchCB = b; }
+void setMB(bool b) { m_launchMB = b; }
 
 private:
 
 // Host and device arrays
 float *h_A;
 float *h_B;
-float *h_C;
 
 float *d_A;
 float *d_B;
-float *d_C;
 
-unsigned long numElements;
-size_t size;
+unsigned long m_numElements;
+unsigned long m_numIter;
 
-unsigned long numChips = 16;
-unsigned long ChipRowSize = 256*sizeof(float);
-unsigned long FullRowSize = numChips * ChipRowSize;
-unsigned long FullRowElements;
-unsigned long numChunks;
-unsigned long ChunkSize;
-unsigned long LastChunkSize;
-unsigned long ChunkElements;
-
+bool m_launchCB;
+bool m_launchMB;
 };
 
 #endif

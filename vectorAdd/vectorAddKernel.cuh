@@ -32,13 +32,32 @@
  * Computes the vector addition of A and B into C. The 3 vectors have the same
  * number of elements numElements.
  */
+
 __global__ void
 vectorAdd(const float *A, const float *B, float *C, int numElements)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
+    i = threadIdx.x;
+    C[i] = A[i+numElements*256];
 
-    if (i < numElements)
+//    if ( i < numElements)
     {
+//        C[i] = A[i] + B[i];
+    }
+}
+
+/* Memory ranges version */
+
+__global__ void
+vectorAddMR(const float *A, const float *B, float *C, int numElements, int ChunkElements, int FullRowElements)
+{
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if ( i < numElements)
+    {
+        int ChunkIdx = i/ChunkElements;
+        int ChunkOff = i%ChunkElements;
+        i = FullRowElements*ChunkIdx + ChunkOff;
         C[i] = A[i] + B[i];
     }
 }

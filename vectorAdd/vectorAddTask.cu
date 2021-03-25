@@ -24,6 +24,7 @@ vectorAddTask::vectorAddTask() {
   d_B = NULL;
   d_C = NULL;
 
+  setMRMode(None);
   setNumElements(50000);
   setPinned(false);
   err = cudaSuccess;
@@ -55,6 +56,21 @@ CUDAtaskNames vectorAddTask::getName() { return name; }
 void vectorAddTask::setNumElements(unsigned long n) {
   numElements = n;
   size = numElements * sizeof(float);
+
+  printf("VA task: %d elements, with size %lu bytes\n", numElements, size);
+  // Memory range parameters
+  if ( mr_mode != None ) {
+    FullRowElements = FullRowSize / sizeof(float);
+    ChunkSize = ChipRowSize; 
+    numChunks = floor( size / ChunkSize );
+    LastChunkSize = size - numChunks * ChunkSize;
+    size = numChunks * FullRowSize;
+    if ( LastChunkSize > 0 )
+      size += FullRowSize;
+    ChunkElements = ChunkSize / sizeof(float);
+    printf("%d - %d - %d - %d - %d - %d\n", numElements, size, numChunks, ChunkSize, LastChunkSize, FullRowElements);  
+  }
+
   setThreadsPerBlock(256);
   setBlocksPerGrid((numElements+threadsPerBlock-1)/threadsPerBlock);
 }
@@ -215,20 +231,44 @@ void vectorAddTask::memHostToDeviceAsync(cudaStream_t stream) {
   if ( profile == EventsProf )
     cudaEventRecord( htdStart, stream);
 
-  err = cudaMemcpyAsync(d_A, h_A, size, cudaMemcpyHostToDevice, stream);
-  if (err != cudaSuccess) {
-    fprintf(stderr,
-            "Failed to copy vector A from host to device (error code %s)!\n",
-            cudaGetErrorString(err));
-    exit(EXIT_FAILURE);
+  if ( mr_mode == None ) {
+    err = cudaMemcpyAsync(d_A, h_A, size, cudaMemcpyHostToDevice, stream);
+    if (err != cudaSuccess) {
+      fprintf(stderr,
+              "Failed to copy vector A from host to device (error code %s)!\n",
+              cudaGetErrorString(err));
+      exit(EXIT_FAILURE);
+    }
+    err = cudaMemcpyAsync(d_B, h_B, size, cudaMemcpyHostToDevice, stream);
+    if (err != cudaSuccess) {
+      fprintf(stderr,
+              "Failed to copy vector B from host to device (error code %s)!\n",
+              cudaGetErrorString(err));
+      exit(EXIT_FAILURE);
+    }
   }
-
-  err = cudaMemcpyAsync(d_B, h_B, size, cudaMemcpyHostToDevice, stream);
-  if (err != cudaSuccess) {
-    fprintf(stderr,
-            "Failed to copy vector B from host to device (error code %s)!\n",
-            cudaGetErrorString(err));
-    exit(EXIT_FAILURE);
+  else { // Memory range mode
+    int ChunkOff = 0, RowOff = 0;
+    for ( int i = 0; i < numChunks; i++ ) {
+      err = cudaMemcpyAsync(d_A + RowOff, h_A + ChunkOff, ChunkSize, cudaMemcpyHostToDevice, stream);
+      if (err != cudaSuccess) {
+        fprintf(stderr,
+                "Failed to copy vector A from host to device (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+      }
+      err = cudaMemcpyAsync(d_B + RowOff, h_B + ChunkOff, ChunkSize, cudaMemcpyHostToDevice, stream);
+      if (err != cudaSuccess) {
+        fprintf(stderr,
+                "Failed to copy vector B from host to device (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+      }
+      ChunkOff += ChunkElements;
+      RowOff += FullRowElements;
+      if ( i == 1 )
+        printf("%d %d %p %p %p %p\n", ChunkOff, RowOff, d_A, d_A + RowOff, h_A, h_A + ChunkOff);
+    }
   }
 
   if ( profile == EventsProf )
@@ -273,14 +313,31 @@ void vectorAddTask::memHostToDevice(void) {
 void vectorAddTask::memDeviceToHostAsync(cudaStream_t stream) {
 
   if ( profile == EventsProf )
-    cudaEventRecord( htdStart, stream);
+    cudaEventRecord( htdStart, stream); 
 
-  err = cudaMemcpyAsync(h_C, d_C, size, cudaMemcpyDeviceToHost, stream);
-  if (err != cudaSuccess) {
-    fprintf(stderr,
-            "Failed to copy vector C from device to host (error code %s)!\n",
-            cudaGetErrorString(err));
-    exit(EXIT_FAILURE);
+  if ( mr_mode == None ) {
+    printf("Copy %d bytes\n", size);
+    err = cudaMemcpyAsync(h_C, d_C, size, cudaMemcpyDeviceToHost, stream);
+    if (err != cudaSuccess) {
+      fprintf(stderr,
+              "Failed to copy vector C from device to host (error code %s)!\n",
+              cudaGetErrorString(err));
+      exit(EXIT_FAILURE);
+    }
+  }
+  else { // Memory range mode
+    int ChunkOff = 0, RowOff = 0;
+    for ( int i = 0; i < numChunks; i++ ) {
+      err = cudaMemcpyAsync(h_C + ChunkOff, d_C + RowOff, ChunkSize, cudaMemcpyDeviceToHost, stream);
+      if (err != cudaSuccess) {
+        fprintf(stderr,
+                "Failed to copy vector A from device to host (error code %s)!\n",
+                cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+      }
+      ChunkOff += ChunkElements;
+      RowOff += FullRowElements;
+    }
   }
 
   if ( profile == EventsProf )
@@ -319,7 +376,16 @@ void vectorAddTask::launchKernelAsync(cudaStream_t stream) {
   if ( profile == EventsProf )
     cudaEventRecord( kernelStart, stream);
 
-  vectorAdd<<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_A, d_B, d_C, numElements);
+  if ( mr_mode == None )
+  {
+    vectorAdd<<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_A, d_B, d_C, kk /*numElements*/);
+  }
+  else
+  {
+    printf("MR launched\n");
+    vectorAddMR<<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_A, d_B, d_C, numElements, ChunkElements, FullRowElements);
+  }
+
   if ( profile == EventsProf )
     cudaEventRecord( kernelEnd, stream);
   
@@ -364,7 +430,7 @@ void vectorAddTask::launchKernel(void) {
 bool vectorAddTask::checkResults(void) {
   for (int i = 0; i < numElements; ++i) {
     if (fabs(h_A[i] + h_B[i] - h_C[i]) > 1e-5) {
-      fprintf(stderr, "Result verification failed at element %d!\n", i);
+      fprintf(stderr, "Result verification failed at element %d! CPU %f GPU %f\n", i, h_A[i] + h_B[i], h_C[i]);
       return false;
     }
   }

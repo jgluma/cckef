@@ -266,7 +266,7 @@ LIBRARIES := -lpthread -lcuda
 
 # Extra includes and paths for CUPTI
 EXTRA_INCLUDES := -I/usr/local/cuda/extras/CUPTI/include
-EXTRA_LIBRARIES := -L /usr/local/cuda/extras/CUPTI/lib -L /usr/local/cuda/extras/CUPTI/lib64 -lcupti
+EXTRA_LIBRARIES := -L /usr/local/cuda/extras/CUPTI/lib -L /usr/local/cuda/extras/CUPTI/lib64 -lcupti -lnvidia-ml
 
 
 ################################################################################
@@ -298,10 +298,19 @@ endif
 ################################################################################
 
 cusrc = $(wildcard tasks/*.cu) \
+        $(wildcard profile/*.cu) \
         $(wildcard vectorAdd/*.cu) \
+        $(wildcard memBench/*.cu) \
 #        $(wildcard BlackScholes/*.cu) \
 
-objs = $(cusrc:.cu=.o)
+
+cppsrc =    $(wildcard tasks/*.cpp) \
+            $(wildcard profile/*.cpp) \
+
+objs = $(cusrc:.cu=.o) $(cppsrc:.cpp=.o)
+
+dep = $(objs:.o=.d)
+
 # Target rules
 all: build
 
@@ -315,10 +324,15 @@ check.deps:
 # endif
 
 %.o:%.cu
-	$(EXEC) $(NVCC) $(INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+	$(EXEC) $(NVCC) $(INCLUDES) $(EXTRA_INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
+
+%.o:%.cpp
+	$(EXEC) $(NVCC) $(INCLUDES) $(EXTRA_INCLUDES) $(ALL_CCFLAGS) $(GENCODE_FLAGS) -o $@ -c $<
 
 ccke: ckeTest.o $(objs)
-	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES)
+	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES) $(EXTRA_LIBRARIES)
+
+-include $(dep)
 
 run: build
 	$(EXEC) ./fccke

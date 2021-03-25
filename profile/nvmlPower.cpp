@@ -39,11 +39,14 @@ void *powerPollingFunc(void *ptr)
 		getNVMLError(nvmlResult);
 
 		// Check if power management mode is enabled.
-		if (pmmode == NVML_FEATURE_ENABLED)
-		{
+	//	if (pmmode == NVML_FEATURE_ENABLED)
+	//	{
 			// Get the power usage in milliWatts.
 			nvmlResult = nvmlDeviceGetPowerUsage(nvmlDeviceID, &powerLevel);
-		}
+		// }
+		// else {
+		// 	fprintf(fp, "power not enabled\n");
+		// }
 
 		// The output file stores power in Watts.
         clock_gettime(CLOCK_MONOTONIC, &now);

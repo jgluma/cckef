@@ -14,6 +14,8 @@
 
 #include "cuda_task_class.h"
 #include "../vectorAdd/vectorAdd.h"
+#include "../dummy/dummy.h"
+
 
 using namespace std;
 

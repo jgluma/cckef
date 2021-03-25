@@ -301,6 +301,7 @@ cusrc = $(wildcard tasks/*.cu) \
         $(wildcard profile/*.cu) \
         $(wildcard vectorAdd/*.cu) \
         $(wildcard memBench/*.cu) \
+        $(wildcard dummy/*.cu) \
 #        $(wildcard BlackScholes/*.cu) \
 
 

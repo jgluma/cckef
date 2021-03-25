@@ -9,6 +9,7 @@
  *
  */
 
+#include "cuda_task_class.h"
 #include "cuda_tasks.h"
 
 CUDAtask *createCUDATask(CUDAtaskNames t) {
@@ -18,6 +19,9 @@ CUDAtask *createCUDATask(CUDAtaskNames t) {
     task = new vectorAddTask();
     break;
   case BS:
+    break;
+  case Dummy:
+    task = new dummyTask();
     break;
   };
 

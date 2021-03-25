@@ -6,8 +6,7 @@
  * @date 2021-02-15
  * 
  */
-#ifndef _VECTORADD_H_
-#define _VECTORADD_H_
+#pragma once
 
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -42,7 +41,7 @@ void launchKernelAsync(cudaStream_t stream);
 void launchKernel(void);
 bool checkResults(void);
 
-void setNumElements(unsigned long n) { m_numElements = n; }
+void setNumElements(unsigned long n);
 unsigned long getNumElements() {return m_numElements;}
 
 void setNumIter(unsigned long n) { m_numIter = n; }
@@ -66,5 +65,3 @@ unsigned long m_numIter;
 bool m_launchCB;
 bool m_launchMB;
 };
-
-#endif

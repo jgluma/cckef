@@ -103,45 +103,37 @@ int main (int argc, char **argv)
 		cudaGetDeviceProperties(&deviceProp, deviceId);	
 		printf("Working on Device %s\n", deviceProp.name);
 
-        memBench mb;
-        mb.init(deviceId);
-        mb.getChipAssignments();
-        mb.getMemoryRanges();
-        mb.writeAssignments();
-        exit(0);
+        // memBench mb;
+        // mb.init(deviceId);
+        // mb.getChipAssignments();
+        // mb.getMemoryRanges();
+        // mb.writeAssignments();
+        // exit(0);
 
         nvmlAPIRun();
 
         // Timers
-        double ProfilingTimeThreshold = 1.0; // Kernels are launched many times during this interval
+        double ProfilingTimeThreshold = 0.1; // Kernels are launched many times during this interval
         struct timespec now;
         double time0, time1, time2, elapsed_time = 0.0, exec_time = 0.0;
 
-        // CUPTI
-        vector<string> event_names {
- //           "active_cycles"
-           };
-        vector<string> metric_names {
-             "l2_read_transactions",
-//             "ipc"
-            };
-//        cupti_profiler::profiler profiler(event_names, metric_names);        
-//        int passes = profiler.get_passes();
-//        std::vector<std::string> curr_metric = init_cupti_profiler( deviceId );
-//        std::string mis_metricas[2] = {"l2_read_transactions", "ipc"};
-      
         // Create task
-        ProfileMode prof = CUPTIProf;//CUPTIProf; //TimerProf;//EventsProf;
-        CUDAtaskNames task_name = VA;
-        CKEmode cke_mode = ASYNC; 
+        ProfileMode prof = TimerProf;//CUPTIProf; //TimerProf;//EventsProf;
+        CUDAtaskNames task_name = Dummy;
+        CKEmode cke_mode = SYNC; 
         MemoryRangeMode mr_mode = None;//None; //Shared;
         CUDAtask *t = createCUDATask(task_name);
-        t->setPinned(true);
+        printf("Task created\n");
+        t->setPinned(false);
         t->setProfileMode(prof);
         t->setCKEMode(cke_mode);
         t->setMRMode(mr_mode);
-        vectorAddTask *vt = dynamic_cast<vectorAddTask*>(t);
-        vt->setNumElements(16*16*1024);
+//      vectorAddTask *vt = dynamic_cast<vectorAddTask*>(t);
+//      vt->setNumElements(16*16*1024);
+
+        dummyTask *vt = dynamic_cast<dummyTask*>(t);
+        vt->setCB(false);
+        vt->setMB(true);
 
         t->allocHostMemory();
         t->dataGeneration();
@@ -186,7 +178,6 @@ int main (int argc, char **argv)
 //            for ( int i = 0; i < curr_metric.size(); i++ )
 for ( int j = 0; j < 1; j++ )
 {
-    vt->kk = j;
 //            for ( int i = 0; i < 1; i++ )
             {
                 printf("%d", j);

@@ -17,7 +17,6 @@ dummyTask::dummyTask() {
 
   setTaskName(Dummy);
 
-  setThreadsPerBlock(256);
   h_A = NULL;
   h_B = NULL;
   d_A = NULL;
@@ -57,6 +56,12 @@ dummyTask::dummyTask(unsigned long nI, bool cb, unsigned long nE, bool mb) {
 
 CUDAtaskNames dummyTask::getName() { return name; }
 
+void dummyTask::setNumElements(unsigned long n) {
+  m_numElements = n;
+  setThreadsPerBlock(256);
+  setBlocksPerGrid((m_numElements+threadsPerBlock-1)/threadsPerBlock);
+}
+
 /**
  * @brief Destroy the vectorAdd task object
  *
@@ -86,7 +91,7 @@ dummyTask::~dummyTask() {
  */
 void dummyTask::allocHostMemory(void) {
   if (pinned) {
-    err = cudaMallocHost((void **)&h_A, m_numElements*sizeof(float));
+    err = cudaMallocHost((void **)&h_A, m_numElements * sizeof(float));
     if (err != cudaSuccess) {
       fprintf(stderr,
               "Failed to allocate pinned host vector A (error code %s)!\n",
@@ -94,7 +99,7 @@ void dummyTask::allocHostMemory(void) {
       exit(EXIT_FAILURE);
     }
 
-    err = cudaMallocHost((void **)&h_B, m_numElements*sizeof(float));
+    err = cudaMallocHost((void **)&h_B, m_numElements * sizeof(float));
     if (err != cudaSuccess) {
       fprintf(stderr,
               "Failed to allocate pinned host vector B (error code %s)!\n",
@@ -102,11 +107,10 @@ void dummyTask::allocHostMemory(void) {
       exit(EXIT_FAILURE);
     }
 
- 
   } else {
-    h_A = (float *)malloc(m_numElements*sizeof(float));
-    h_B = (float *)malloc(m_numElements*sizeof(float));
- 
+    h_A = (float *)malloc(m_numElements * sizeof(float));
+    h_B = (float *)malloc(m_numElements * sizeof(float));
+
     // Verify that allocations succeeded
     if (h_A == NULL || h_B == NULL) {
       fprintf(stderr, "Failed to allocate host vectors!\n");
@@ -137,7 +141,7 @@ void dummyTask::freeHostMemory(void) {
  */
 void dummyTask::allocDeviceMemory(void) {
   // Allocate the device input vector A
-  err = cudaMalloc((void **)&d_A, m_numElements*sizeof(float));
+  err = cudaMalloc((void **)&d_A, m_numElements * sizeof(float));
 
   if (err != cudaSuccess) {
     fprintf(stderr, "Failed to allocate device vector A (error code %s)!\n",
@@ -146,14 +150,13 @@ void dummyTask::allocDeviceMemory(void) {
   }
 
   // Allocate the device input vector B
-  err = cudaMalloc((void **)&d_B, m_numElements*sizeof(float));
+  err = cudaMalloc((void **)&d_B, m_numElements * sizeof(float));
 
   if (err != cudaSuccess) {
     fprintf(stderr, "Failed to allocate device vector B (error code %s)!\n",
             cudaGetErrorString(err));
     exit(EXIT_FAILURE);
   }
-
 }
 
 /**
@@ -184,20 +187,20 @@ void dummyTask::dataGeneration(void) {
  */
 void dummyTask::memHostToDeviceAsync(cudaStream_t stream) {
 
-  if ( profile == EventsProf )
-    cudaEventRecord( htdStart, stream);
+  if (profile == EventsProf)
+    cudaEventRecord(htdStart, stream);
 
-  err = cudaMemcpyAsync(d_A, h_A, m_numElements*sizeof(float), cudaMemcpyHostToDevice, stream);
+  err = cudaMemcpyAsync(d_A, h_A, m_numElements * sizeof(float),
+                        cudaMemcpyHostToDevice, stream);
   if (err != cudaSuccess) {
-      fprintf(stderr,
-              "Failed to copy vector A from host to device (error code %s)!\n",
-              cudaGetErrorString(err));
-      exit(EXIT_FAILURE);
+    fprintf(stderr,
+            "Failed to copy vector A from host to device (error code %s)!\n",
+            cudaGetErrorString(err));
+    exit(EXIT_FAILURE);
   }
 
-  if ( profile == EventsProf )
-    cudaEventRecord( htdEnd, stream);
-
+  if (profile == EventsProf)
+    cudaEventRecord(htdEnd, stream);
 }
 
 /**
@@ -206,10 +209,11 @@ void dummyTask::memHostToDeviceAsync(cudaStream_t stream) {
  */
 void dummyTask::memHostToDevice(void) {
 
-  if ( profile == EventsProf )
-    cudaEventRecord( htdStart, 0);
+  if (profile == EventsProf)
+    cudaEventRecord(htdStart, 0);
 
-  err = cudaMemcpy(d_A, h_A, m_numElements*sizeof(float), cudaMemcpyHostToDevice);
+  err = cudaMemcpy(d_A, h_A, m_numElements * sizeof(float),
+                   cudaMemcpyHostToDevice);
   if (err != cudaSuccess) {
     fprintf(stderr,
             "Failed to copy vector A from host to device (error code %s)!\n",
@@ -217,9 +221,8 @@ void dummyTask::memHostToDevice(void) {
     exit(EXIT_FAILURE);
   }
 
-  if ( profile == EventsProf )
-    cudaEventRecord( htdEnd);
-
+  if (profile == EventsProf)
+    cudaEventRecord(htdEnd);
 }
 
 /**
@@ -229,31 +232,11 @@ void dummyTask::memHostToDevice(void) {
  */
 void dummyTask::memDeviceToHostAsync(cudaStream_t stream) {
 
-  if ( profile == EventsProf )
-    cudaEventRecord( htdStart, stream); 
+  if (profile == EventsProf)
+    cudaEventRecord(htdStart, stream);
 
-    err = cudaMemcpyAsync(h_C, d_C, m_numElements*sizeof(float), cudaMemcpyDeviceToHost, stream);
-    if (err != cudaSuccess) {
-      fprintf(stderr,
-              "Failed to copy vector C from device to host (error code %s)!\n",
-              cudaGetErrorString(err));
-      exit(EXIT_FAILURE);
-    }
-
-  if ( profile == EventsProf )
-    cudaEventRecord( htdEnd, stream);
-
-}
-
-/**
- * @brief Synchronous HTD memory transfer
- *
- */
-void dummyTask::memDeviceToHost(void) {
-  if ( profile == EventsProf )
-    cudaEventRecord( dthStart);
-
-  err = cudaMemcpy(h_C, d_C, m_numElements*sizeof(float), cudaMemcpyDeviceToHost);
+  err = cudaMemcpyAsync(h_B, d_B, m_numElements * sizeof(float),
+                        cudaMemcpyDeviceToHost, stream);
   if (err != cudaSuccess) {
     fprintf(stderr,
             "Failed to copy vector C from device to host (error code %s)!\n",
@@ -261,9 +244,29 @@ void dummyTask::memDeviceToHost(void) {
     exit(EXIT_FAILURE);
   }
 
-  if ( profile == EventsProf )
-    cudaEventRecord( dthEnd);
+  if (profile == EventsProf)
+    cudaEventRecord(htdEnd, stream);
+}
 
+/**
+ * @brief Synchronous HTD memory transfer
+ *
+ */
+void dummyTask::memDeviceToHost(void) {
+  if (profile == EventsProf)
+    cudaEventRecord(dthStart);
+
+  err = cudaMemcpy(h_B, d_B, m_numElements * sizeof(float),
+                   cudaMemcpyDeviceToHost);
+  if (err != cudaSuccess) {
+    fprintf(stderr,
+            "Failed to copy vector C from device to host (error code %s)!\n",
+            cudaGetErrorString(err));
+    exit(EXIT_FAILURE);
+  }
+
+  if (profile == EventsProf)
+    cudaEventRecord(dthEnd);
 }
 
 /**
@@ -273,25 +276,24 @@ void dummyTask::memDeviceToHost(void) {
  */
 void dummyTask::launchKernelAsync(cudaStream_t stream) {
 
-  if ( profile == EventsProf )
-    cudaEventRecord( kernelStart, stream);
+  if (profile == EventsProf)
+    cudaEventRecord(kernelStart, stream);
 
-  if ( m_launchCB )
+  if (m_launchCB)
     cbDummy<<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_A, d_B, m_numIter);
 
-  if ( m_launchMB )
+  if (m_launchMB)
     mbDummy<<<blocksPerGrid, threadsPerBlock, 0, stream>>>(d_A, d_B, m_numElements);
 
-  if ( profile == EventsProf )
-    cudaEventRecord( kernelEnd, stream);
-  
+  if (profile == EventsProf)
+    cudaEventRecord(kernelEnd, stream);
+
   err = cudaGetLastError();
   if (err != cudaSuccess) {
     fprintf(stderr, "Failed to launch dummy kernel (error code %s)!\n",
             cudaGetErrorString(err));
     exit(EXIT_FAILURE);
   }
-
 }
 
 /**
@@ -300,22 +302,22 @@ void dummyTask::launchKernelAsync(cudaStream_t stream) {
  */
 void dummyTask::launchKernel(void) {
 
-  if ( profile == EventsProf )
-    cudaEventRecord( kernelStart);
+  if (profile == EventsProf)
+    cudaEventRecord(kernelStart);
 
-  if ( m_launchCB )
+  if (m_launchCB)
     cbDummy<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, m_numIter);
 
-  if ( m_launchMB )
+  if (m_launchMB)
     mbDummy<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, m_numElements);
 
-  if ( profile == EventsProf )
-    cudaEventRecord( kernelEnd);
+  if (profile == EventsProf)
+    cudaEventRecord(kernelEnd);
 
-    err = cudaGetLastError();
+  err = cudaGetLastError();
 
   if (err != cudaSuccess) {
-    fprintf(stderr, "Failed to launch vectorAdd kernel (error code %s)!\n",
+    fprintf(stderr, "Failed to launch dummy kernel (error code %s)!\n",
             cudaGetErrorString(err));
     exit(EXIT_FAILURE);
   }
@@ -327,6 +329,4 @@ void dummyTask::launchKernel(void) {
  * @return true Test passed
  * @return false Test failed
  */
-bool dummyTask::checkResults(void) {
-  return true;
-}
+bool dummyTask::checkResults(void) { return true; }

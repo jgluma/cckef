@@ -13,7 +13,7 @@
  */
 
 __global__ void
-cbDummy(const float *A, const float *B, unsigned long numIter)
+cbDummy(const float *A, float *B, unsigned long numIter)
 {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     float data, tmp = 0;
@@ -39,7 +39,7 @@ cbDummy(const float *A, const float *B, unsigned long numIter)
  */
 
  __global__ void
- mbDummy(const float *A, const float *B, unsigned long numElements)
+ mbDummy(const float *A, float *B, unsigned long numElements)
  {
      int i = blockDim.x * blockIdx.x + threadIdx.x;
 

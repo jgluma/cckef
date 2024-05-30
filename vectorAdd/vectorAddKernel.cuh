@@ -34,30 +34,132 @@
  */
 
 __global__ void
-vectorAdd(const float *A, const float *B, float *C, int numElements)
+vectorAdd(const float *A, const float *B, float *C, int numElements, int numIterations)
 {
-    int i = blockDim.x * blockIdx.x + threadIdx.x;
-    i = threadIdx.x;
-    C[i] = A[i+numElements*256];
-
-//    if ( i < numElements)
+    int iter = 0;
+    while (iter < numIterations)
     {
-//        C[i] = A[i] + B[i];
+        int i = blockDim.x * blockIdx.x + threadIdx.x;
+
+        if (i < numElements)
+            C[i] = A[i] + B[i];
+
+        iter++;
     }
 }
 
-/* Memory ranges version */
+/* Persistent blocks version */
 
 __global__ void
-vectorAddMR(const float *A, const float *B, float *C, int numElements, int ChunkElements, int FullRowElements)
+vectorAddP(const float *A, const float *B, float *C, int numElements, int numIterations)
 {
-    int i = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if ( i < numElements)
+    int nTasks = (numElements + blockDim.x - 1) / blockDim.x;
+    int iter = 0;
+    while (iter < numIterations)
     {
-        int ChunkIdx = i/ChunkElements;
-        int ChunkOff = i%ChunkElements;
-        i = FullRowElements*ChunkIdx + ChunkOff;
-        C[i] = A[i] + B[i];
+        int task = blockIdx.x;
+        while (task < nTasks)
+        {
+            int i = blockDim.x * task + threadIdx.x;
+
+            if (i < numElements)
+                C[i] = A[i] + B[i];
+
+            task += gridDim.x;
+        }
+        iter++;
+    }
+}
+
+/*  Memory ranges version */
+
+__global__ void
+vectorAddMR(const float *A, const float *B, float *C, int numElements, int numIterations)
+{
+    int iter = 0;
+    while (iter < numIterations)
+    {
+        int i = blockDim.x * blockIdx.x + threadIdx.x;
+        __shared__ int offsetA, offsetB, offsetC;
+        if (threadIdx.x == 0)
+        {
+            int i2d = i / (256 * 256);
+            int i2r = (i % (256 * 256)) / 256;
+
+            int first_level = (*((int *)A + i2d)) * 256;
+            offsetA = (*((int *)A + first_level + i2r)) * 256;
+        }
+        else if (threadIdx.x == 1)
+        {
+            int i2d = i / (256 * 256);
+            int i2r = (i % (256 * 256)) / 256;
+            int first_level = (*((int *)B + i2d)) * 256;
+            offsetB = (*((int *)B + first_level + i2r)) * 256;
+        }
+        else if (threadIdx.x == 2)
+        {
+            int i2d = i / (256 * 256);
+            int i2r = (i % (256 * 256)) / 256;
+            int first_level = (*((int *)C + i2d)) * 256;
+            offsetC = (*((int *)C + first_level + i2r)) * 256;
+        }
+        __syncthreads();
+
+        if (i < numElements)
+            C[offsetC + threadIdx.x] = A[offsetA + threadIdx.x] + B[offsetB + threadIdx.x];
+
+        iter++;
+    }
+}
+
+/* Persistent blocks + Memory ranges version */
+
+__global__ void
+vectorAddPMR(const float *A, const float *B, float *C, int numElements, int numIterations)
+{
+    int nTasks = (numElements + blockDim.x - 1) / blockDim.x;
+    int iter = 0;
+    while (iter < numIterations)
+    {
+        int task = blockIdx.x;
+        while (task < nTasks)
+        {
+            int i = blockDim.x * task + threadIdx.x;
+            // Compute chunk offset for A and B
+            __shared__ int offsetA, offsetB, offsetC;
+            if (threadIdx.x == 0)
+            {
+                int i2d = i / (256 * 256);
+                int i2r = (i % (256 * 256)) / 256;
+
+                int first_level = (*((int *)A + i2d)) * 256;
+                offsetA = (*((int *)A + first_level + i2r)) * 256;
+            }
+            else if (threadIdx.x == 1)
+            {
+                int i2d = i / (256 * 256);
+                int i2r = (i % (256 * 256)) / 256;
+                int first_level = (*((int *)B + i2d)) * 256;
+                offsetB = (*((int *)B + first_level + i2r)) * 256;
+            }
+            else if (threadIdx.x == 2)
+            {
+                int i2d = i / (256 * 256);
+                int i2r = (i % (256 * 256)) / 256;
+                int first_level = (*((int *)C + i2d)) * 256;
+                offsetC = (*((int *)C + first_level + i2r)) * 256;
+            }
+            __syncthreads();
+
+            if (i < numElements)
+            {
+                C[offsetC + threadIdx.x] = A[offsetA + threadIdx.x] + B[offsetB + threadIdx.x];
+                // if ( threadIdx.x == 0 )
+                //     printf("Element %d of %d, Tasks %d of %d : %f + %f = %f\t%d - %d - %d\n", i, numElements, task, nTasks, A[offsetA + threadIdx.x], B[offsetB + threadIdx.x], C[offsetC + threadIdx.x], offsetA, offsetB, offsetC);
+            }
+
+            task += gridDim.x;
+        }
+        iter++;
     }
 }

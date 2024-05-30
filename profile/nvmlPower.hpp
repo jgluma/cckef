@@ -19,4 +19,11 @@ void nvmlAPIEnd();
 void *powerPollingFunc(void *ptr);
 int getNVMLError(nvmlReturn_t resultToCheck);
 
+void nvmlPowerInit();
+void *nvmlPowerStart(void *ptr);
+void nvmlPowerEnd();
+
+long long getRefTime();
+void setRefTime(long long ref);
+
 #endif

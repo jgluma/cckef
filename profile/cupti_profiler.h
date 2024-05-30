@@ -12,6 +12,7 @@
 #pragma once
 
 #include <stdio.h>
+#include <unistd.h>
 
 #include <vector>
 #include <map>
@@ -20,48 +21,70 @@
 #include <cuda.h>
 #include <cupti.h>
 
-#define DRIVER_API_CALL(apiFuncCall)                                           \
-do {                                                                           \
-    CUresult _status = apiFuncCall;                                            \
-    if (_status != CUDA_SUCCESS) {                                             \
-        fprintf(stderr, "%s:%d: error: function %s failed with error %d.\n",   \
-                __FILE__, __LINE__, #apiFuncCall, _status);                    \
-        exit(-1);                                                              \
-    }                                                                          \
-} while (0)
+#include <sys/shm.h>   /* shmat(), IPC_RMID        */
+#include <errno.h>     /* errno, ECHILD            */
+#include <semaphore.h> /* sem_open(), sem_destroy(), sem_wait().. */
+#include <fcntl.h>     /* O_CREAT, O_EXEC          */
 
-#define RUNTIME_API_CALL(apiFuncCall)                                          \
-do {                                                                           \
-    cudaError_t _status = apiFuncCall;                                         \
-    if (_status != cudaSuccess) {                                              \
-        fprintf(stderr, "%s:%d: error: function %s failed with error %s.\n",   \
-                __FILE__, __LINE__, #apiFuncCall, cudaGetErrorString(_status));\
-        exit(-1);                                                              \
-    }                                                                          \
-} while (0)
-
-#define CUPTI_CALL(call)                                                \
-  do {                                                                  \
-    CUptiResult _status = call;                                         \
-    if (_status != CUPTI_SUCCESS) {                                     \
-      const char *errstr;                                               \
-      cuptiGetResultString(_status, &errstr);                           \
-      fprintf(stderr, "%s:%d: error: function %s failed with error %s.\n", \
-              __FILE__, __LINE__, #call, errstr);                       \
-      exit(-1);                                                         \
-    }                                                                   \
+#define DRIVER_API_CALL(apiFuncCall)                                       \
+  do                                                                       \
+  {                                                                        \
+    CUresult _status = apiFuncCall;                                        \
+    if (_status != CUDA_SUCCESS)                                           \
+    {                                                                      \
+      fprintf(stderr, "%s:%d: error: function %s failed with error %d.\n", \
+              __FILE__, __LINE__, #apiFuncCall, _status);                  \
+      exit(-1);                                                            \
+    }                                                                      \
   } while (0)
 
+#define RUNTIME_API_CALL(apiFuncCall)                                         \
+  do                                                                          \
+  {                                                                           \
+    cudaError_t _status = apiFuncCall;                                        \
+    if (_status != cudaSuccess)                                               \
+    {                                                                         \
+      fprintf(stderr, "%s:%d: error: function %s failed with error %s.\n",    \
+              __FILE__, __LINE__, #apiFuncCall, cudaGetErrorString(_status)); \
+      exit(-1);                                                               \
+    }                                                                         \
+  } while (0)
+
+#define CUPTI_CALL(call)                                                   \
+  do                                                                       \
+  {                                                                        \
+    CUptiResult _status = call;                                            \
+    if (_status != CUPTI_SUCCESS)                                          \
+    {                                                                      \
+      const char *errstr;                                                  \
+      cuptiGetResultString(_status, &errstr);                              \
+      fprintf(stderr, "%s:%d: error: function %s failed with error %s.\n", \
+              __FILE__, __LINE__, #call, errstr);                          \
+      exit(-1);                                                            \
+    }                                                                      \
+  } while (0)
+
+#define CHECK_CUPTI_ERROR(err, cuptifunc)                   \
+  if (err != CUPTI_SUCCESS)                                 \
+  {                                                         \
+    const char *errstr;                                     \
+    cuptiGetResultString(err, &errstr);                     \
+    printf("%s:%d:Error %s for CUPTI API function '%s'.\n", \
+           __FILE__, __LINE__, errstr, cuptifunc);          \
+    return 0;                                               \
+  }
+
 #define ALIGN_SIZE (8)
-#define ALIGN_BUFFER(buffer, align)                                            \
-  (((uintptr_t) (buffer) & ((align)-1)) ? ((buffer) + (align) - ((uintptr_t) (buffer) & ((align)-1))) : (buffer))
+#define ALIGN_BUFFER(buffer, align) \
+  (((uintptr_t)(buffer) & ((align)-1)) ? ((buffer) + (align) - ((uintptr_t)(buffer) & ((align)-1))) : (buffer))
 
 #ifndef __CUPTI_PROFILER_NAME_SHORT
-	#define __CUPTI_PROFILER_NAME_SHORT 128
+#define __CUPTI_PROFILER_NAME_SHORT 128
 #endif
 
 // User data for event collection callback
-typedef struct MetricData_st {
+typedef struct MetricData_st
+{
   // the device where metric is being collected
   CUdevice device;
   // the set of event groups to collect for a pass
@@ -77,45 +100,50 @@ typedef struct MetricData_st {
   uint64_t *eventValueArray;
   // array of instances values
   uint64_t *eventNumInstances;
-  uint64_t **eventInstancesArray;  
+  uint64_t **eventInstancesArray;
 } MetricData_t;
 
-class CuptiProfiler {
-
+class CuptiProfiler
+{
 public:
-std::vector<std::string> init_cupti_profiler(	const int device_num );
+  // Continuous mode
+  void init_cupti_sampler(const int device_num);
+  void set_cupti_sampler(const char *eventName);
+  void start_cupti_sampler(const char *eventName);
+//  static void *sampling_func(void *arg);
+  void end_cupti_sampler(long long reftime);
 
-//void CUPTIAPI getMetricValueCallback(void *userdata, CUpti_CallbackDomain domain,
-//                       CUpti_CallbackId cbid, const CUpti_CallbackData *cbInfo);
-//void CUPTIAPI bufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords);
-//void CUPTIAPI bufferCompleted(CUcontext ctx, uint32_t streamId, uint8_t *buffer, size_t size, size_t validSize);
+  std::vector<std::string> init_cupti_profiler(const int device_num);
 
-void start_kernelduration_cupti_profiler();
-uint64_t end_kernelduration_cupti_profiler();
-CUpti_EventGroupSets *start_cupti_profiler(	const char *metricName );
-void advance_cupti_profiler( CUpti_EventGroupSets *passData, int pass );
-void stop_cupti_profiler( bool getvalue );
-void free_cupti_profiler();
+  void start_kernelduration_cupti_profiler();
+  uint64_t end_kernelduration_cupti_profiler();
 
-std::vector<std::string> available_metrics_cupti_profiler(	CUdevice device, bool print_names);
+  CUpti_EventGroupSets *start_cupti_profiler(const char *metricName);
+  void advance_cupti_profiler(CUpti_EventGroupSets *passData, int pass);
+  void stop_cupti_profiler(bool getvalue);
 
-FILE *open_metric_file( const char *name );
-void close_metric_file();
-bool checkConsistency( unsigned long long expected );
-int getMaxIdxEvent( unsigned long long expected );
+  void unsubscribe_cupti_profiler();
+  void free_cupti_profiler();
 
-void print_event_instances();
+  std::vector<std::string> available_metrics_cupti_profiler(CUdevice device, bool print_names);
+
+  FILE *open_metric_file(const char *name);
+  void close_metric_file();
+  bool checkConsistency(unsigned long long expected);
+  int getMaxIdxEvent(unsigned long long expected);
+
+  void print_event_instances();
 
 private:
+  // CUcontext m_context = 0;
+  // CUdevice m_device = 0;
 
-CUcontext m_context = 0;
-CUdevice m_device = 0;
-CUpti_SubscriberHandle m_subscriber;
-MetricData_t m_metricData;
-CUpti_MetricID m_metricId;
+  CUpti_SubscriberHandle m_subscriber;
+  MetricData_t m_metricData;
+  CUpti_MetricID m_metricId;
 
-CUpti_EventID *m_eventId;
-uint64_t *m_numEvents;
-uint64_t *m_numInstances;
-uint64_t **m_numInstancesArray;
+  CUpti_EventID *m_eventId;
+  uint64_t *m_numEvents;
+  uint64_t *m_numInstances;
+  uint64_t **m_numInstancesArray;
 };

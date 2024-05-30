@@ -14,10 +14,49 @@
 
 using namespace std;
 
-typedef enum {VA=0, BS, MemBench, Dummy} CUDAtaskNames;
-typedef enum {NoProfile=0, TimerProf, EventsProf, CUPTIProf} ProfileMode;
-typedef enum {SYNC=0, ASYNC} CKEmode;
-typedef enum {None=0, Shared, NonShared} MemoryRangeMode;
+typedef enum
+{
+	Dummy = 0,
+	matrixMul,
+	VA,
+	BS,
+	PF,
+	MemBench
+} CUDAtaskNames;
+typedef enum
+{
+	NoProfile = 0,
+	TimerProf,
+	EventsProf,
+	CUPTIProf,
+	CUPTISample
+} ProfileMode;
+typedef enum
+{
+	SYNC = 0,
+	ASYNC
+} CKEmode;
+typedef enum
+{
+	None = 0,
+	Shared,
+	NonShared
+} MemoryRangeMode;
+typedef enum
+{
+	All = 0,
+	Half,
+	ThreeQuarters
+} AssignmentMode;
+
+typedef enum
+{
+	Original = 0,
+	Persistent,
+	MemoryRanges,
+	PersistentMemoryRanges
+} ExecutionMode;
+
 /**
  * @class CUDAtask
  * @brief A generic CUDA task
@@ -29,7 +68,6 @@ class CUDAtask
 {
 
 public:
-
 	virtual CUDAtaskNames getName() = 0;
 	/**
 	 * @brief Alloc host memory
@@ -110,47 +148,67 @@ public:
 	 */
 	virtual bool checkResults(void) = 0;
 
-	virtual void setCKEMode( CKEmode m ) {
-		cke_mode = m;
-		if ( cke_mode == ASYNC )
-			cudaStreamCreate( &t_stream );
+	virtual void setExecMode(ExecutionMode m)
+	{
+		exec_mode = m;
 	}
 
-	virtual void setMRMode( MemoryRangeMode m ) {
+	virtual ExecutionMode getExecMode() { return exec_mode; }
+
+	virtual void setCKEMode(CKEmode m)
+	{
+		cke_mode = m;
+		if (cke_mode == ASYNC)
+			cudaStreamCreate(&t_stream);
+	}
+
+	virtual CKEmode getCKEMode() { return cke_mode; }
+
+	virtual void setMRMode(MemoryRangeMode m)
+	{
 		mr_mode = m;
 	}
 
-	virtual void htdTransfer() {
-		if ( cke_mode == SYNC )
+	virtual MemoryRangeMode getMRMode() { return mr_mode; }
+
+	virtual void htdTransfer()
+	{
+		if (cke_mode == SYNC)
 			memHostToDevice();
 		else
-			memHostToDeviceAsync( t_stream );
+			memHostToDeviceAsync(t_stream);
 	}
 
-	virtual void dthTransfer() {
-		if ( cke_mode == SYNC )
+	virtual void dthTransfer()
+	{
+		if (cke_mode == SYNC)
 			memDeviceToHost();
 		else
-			memDeviceToHostAsync( t_stream );
+			memDeviceToHostAsync(t_stream);
 	}
 
-	virtual void kernelExec() {
-		if ( cke_mode == SYNC )
+	virtual void kernelExec()
+	{
+		if (cke_mode == SYNC)
 			launchKernel();
 		else
-			launchKernelAsync( t_stream );
+			launchKernelAsync(t_stream);
 	}
 
-	virtual void setTaskName( CUDAtaskNames t) { name = t;}
-	virtual void setPinned(bool p) { pinned = p;}
-	virtual void setThreadsPerBlock(int t) { threadsPerBlock = t; }
-	virtual void setBlocksPerGrid(int b) { blocksPerGrid = b; }
+	virtual void setTaskName(CUDAtaskNames t) { name = t; }
+	virtual void setPinned(bool p) { pinned = p; }
+	virtual void setDeviceID(int d) { deviceID = d; }
+	virtual void setThreadsPerBlock(dim3 &t) { m_threadsPerBlock = t; }
+	virtual void setBlocksPerGrid(dim3 &b) { m_blocksPerGrid = b; }
+	virtual void setPersistentBlocks(void) = 0;
 
-	virtual int getThreadsPerBlock() { return threadsPerBlock; }
-	virtual int getBlocksPerGrid() { return blocksPerGrid; }
+	virtual dim3 getThreadsPerBlock() { return m_threadsPerBlock; }
+	virtual dim3 getBlocksPerGrid() { return m_blocksPerGrid; }
 
-	virtual void setProfileMode(ProfileMode p) {
-		if ( p == EventsProf )
+	// Provide a default implementation for next methods
+	virtual void setProfileMode(ProfileMode p)
+	{
+		if (p == EventsProf)
 		{
 			cudaEventCreate(&htdStart);
 			cudaEventCreate(&htdEnd);
@@ -162,51 +220,87 @@ public:
 		profile = p;
 	}
 
-	virtual float getHtDElapsedTime() {
-		if ( profile == EventsProf )
+	virtual ProfileMode getProfileMode() { return profile; }
+
+	virtual float getHtDElapsedTime()
+	{
+		if (profile == EventsProf)
 		{
 			cudaEventSynchronize(htdEnd);
 			cudaEventElapsedTime(&htdElapsedTime, htdStart, htdEnd);
 		}
-		return(htdElapsedTime);
+		return (htdElapsedTime);
 	}
 
-	virtual float getDtHElapsedTime() {
-		if ( profile == EventsProf )
+	virtual float getDtHElapsedTime()
+	{
+		if (profile == EventsProf)
 		{
 			cudaEventSynchronize(dthEnd);
 			cudaEventElapsedTime(&dthElapsedTime, dthStart, dthEnd);
 		}
-		return(dthElapsedTime);
+		return (dthElapsedTime);
 	}
 
-	virtual float getKernelElapsedTime() {
-		if ( profile == EventsProf )
+	virtual float getKernelElapsedTime()
+	{
+		if (profile == EventsProf)
 		{
 			cudaEventSynchronize(kernelEnd);
 			cudaEventElapsedTime(&kernelElapsedTime, kernelStart, kernelEnd);
 		}
-		return(kernelElapsedTime);
+		return (kernelElapsedTime);
 	}
 
+	virtual void setAssignments(int numChips, int *numChipAssignments, int *chipMR);
+
+	virtual void transferHeaderHtD(void *d_A, void *h_A, size_t count, int *chunks, int idx);
+	virtual void transferChunksHtD(void *d_A, void *h_A, size_t count, int *chunks, int idx);
+	virtual void transferChunksDtH(void *d_A, void *h_A, size_t count, int *chunks, int idx);
+
+	virtual void setNumLaunchs(int numLaunchs) { m_numLaunchs = numLaunchs; }
+	virtual int getNumLaunchs() { return m_numLaunchs; }
+
+	virtual void setAssignmentMode(AssignmentMode m) { assig_mode = m; }
+
+	virtual void setDeviceMemory(float *ptr) { d_ptr = (void *)ptr; }
+
+	virtual void setAllModules(int reverse) { m_numCombinations = 0; }
+	virtual int getNumCombinations() { return m_numCombinations; }
+	virtual int *selectModules(int init, int step, int n);
+	virtual void sendData(void *d_ptr, void *h_ptr, int *ptEntries, int numEntries);
+	virtual void sendPageTables(void *d_ptr, void *h_ptr, int numEntries);
+	virtual void receiveData(void *d_ptr, void *h_ptr, int *ptEntries, int numEntries);
 
 protected:
 	// Task generic variables
 	CUDAtaskNames name;
 	// CUDA configuration
-	CKEmode cke_mode; // CKE mode: SYNC or ASYNC
+	int deviceID;
+	CKEmode cke_mode;		 // CKE mode: SYNC or ASYNC
 	MemoryRangeMode mr_mode; // Memory range mode: none, shared or unshared
 	cudaStream_t t_stream;
 	bool pinned = false; // True to request pinned memory
-	cudaError_t err; // Error code to check return values for CUDA calls
-	int threadsPerBlock;
-	int blocksPerGrid;
+	cudaError_t err;	 // Error code to check return values for CUDA calls
+	dim3 m_threadsPerBlock;
+	dim3 m_blocksPerGrid;
+
+	ExecutionMode exec_mode;
+
+	// Memory partition variables
+	void *d_ptr;									// Device memory pointer to allocate memory for all arrays
+	int chunkSize, chunkInts;						// Size in bytes of a chunk, and number of ints in a chunk
+    int m_numCombinations;
+
+	int *chipAssignments0, *chipAssignments1;		// Memory chips assignments for partition 0 (1)
+	int maxChipsAssignments0, maxChipsAssignments1; // Max avalaible chips assignments for 0 (1)
+	AssignmentMode assig_mode;						// Chips assignments mode
 
 	// CUDA profiling
 	ProfileMode profile = NoProfile;
 	cudaEvent_t htdStart, htdEnd, dthStart, dthEnd, kernelStart, kernelEnd;
 	float htdElapsedTime, dthElapsedTime, kernelElapsedTime;
-
+	int m_numLaunchs;
 };
 
 #endif

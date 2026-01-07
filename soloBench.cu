@@ -382,6 +382,7 @@ int main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
+        printf("Lets go with size %d\n", size);
         memprof.setPtr(d_ptr, size);
         memprof.profileMemory();
         memprof.writeAssignments();

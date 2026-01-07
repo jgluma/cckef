@@ -52,11 +52,11 @@ memProfile(volatile float *ptr, unsigned long long numOffsets, volatile int *sta
     if (threadIdx.x == 0)
     {
         *status = FLUSH_SAMPLES;
-        // printf("th %d\n", *status);
+        //printf("th %d\n", *status);
         __threadfence_system(); // Host thread must be aware of this
         while (*status != CONT_KERNEL)
-            __nanosleep(1000);
-        // printf("\tth %d\n", *status);
+            ;//__nanosleep(1000);
+        //printf("\tth %d\n", *status);
     }
     __syncthreads();
 
@@ -67,12 +67,12 @@ memProfile(volatile float *ptr, unsigned long long numOffsets, volatile int *sta
         {
             *current_offset = offset;
             *status = START_SAMPLES;
-            // printf("th %d off %d\n", *status, *current_offset);
+            //printf("th %d off %d\n", *status, *current_offset);
             __threadfence_system(); // Host thread must be aware of this
 
             while (*status == START_SAMPLES)
-                __nanosleep(1000);
-            // printf("\tth %d off %d\n", *status, *current_offset);
+                ;//__nanosleep(1000);
+            //printf("\tth %d off %d\n", *status, *current_offset);
         }
         __syncthreads();
 
@@ -87,15 +87,15 @@ memProfile(volatile float *ptr, unsigned long long numOffsets, volatile int *sta
             numrepeats++;
             if (numrepeats < 10)
                 offset--;
-            else if (threadIdx.x == 0)
-                printf("Flushed %d times for offset %llu\n", numrepeats, offset);
+//            else if (threadIdx.x == 0)
+//                printf("Flushed %d times for offset %llu\n", numrepeats, offset);
             __syncthreads();
             if (threadIdx.x == 0)
             {
                 *status = FLUSH_SAMPLES;
                 __threadfence_system(); // Host thread must be aware of this
                 while (*status != CONT_KERNEL)
-                    __nanosleep(1000);
+                    ;//__nanosleep(1000);
             }
             __syncthreads();
         }
@@ -145,6 +145,7 @@ static void *sampling_func(void *arg)
     {
         if (*shStatus == START_SAMPLES || *shStatus == FLUSH_SAMPLES)
         {
+            // printf("Status %d\n", *shStatus);
 
             cuptiErr = cuptiEventGroupReadEvent(eventGroup,
                                                 CUPTI_EVENT_READ_FLAG_NONE,
@@ -155,6 +156,8 @@ static void *sampling_func(void *arg)
                 printf("Failed to read value for \"%s\"\n", m_eventName0);
                 exit(-1);
             }
+
+            // printf("\tStatus %d - bytes read %d\n", *shStatus, bytesRead0);
 
             cuptiErr = cuptiEventGroupReadEvent(eventGroup,
                                                 CUPTI_EVENT_READ_FLAG_NONE,
@@ -168,20 +171,22 @@ static void *sampling_func(void *arg)
 
             if (*shStatus == FLUSH_SAMPLES)
             {
+                // printf("Flushed\n");
                 *shStatus = CONT_KERNEL;
                 usleep(1);
             }
             else if (*shStatus == START_SAMPLES)
             {
+                // printf("Started\n");
                 // Check consistency
                 eventVal = 0;
                 unsigned long long expected = 0.8 * (4 * thblock.x / 32) * blgrid.x;
                 int numMax = 0, idx = -1;
                 int wrong = 0;
-                // printf("%d: ", shOffset[0]);
+                //printf("shOffset %d: ", shOffset[0]);
                 for (j = 0; j < numInstances; j++)
                 {
-                    // printf("%d - %d\t", eventValues0[j], eventValues1[j]);
+                    //printf("%d - %d\t", eventValues0[j], eventValues1[j]);
                     eventVal = eventValues0[j] + eventValues1[j];
                     if (eventVal > expected)
                     {
@@ -189,10 +194,10 @@ static void *sampling_func(void *arg)
                         idx = j;
                     }
                 }
-                // printf("\n");
-                if (numMax == 1)
+                //printf(" %d > %d - %f x %d\n", numMax, expected, perc, numChipAssignments);
+                // if (numMax == 1000)
                 { // Get assignments
-                    wrong = 1;
+                //    wrong = 1;
                     if (shOffset[0] < 0 || shOffset[0] >= numChipAssignments)
                     {
                         fprintf(stderr, "Warning: something went wrong, wrong offset %d", shOffset[0]);
@@ -221,6 +226,7 @@ static void *sampling_func(void *arg)
         }
         else
         {
+//            printf("Wtf!\n");
             usleep(1);
         }
     }
@@ -318,23 +324,23 @@ void MemoryProfiler::profileMemory()
     // Init CUPTI
     cuptiErr = cuptiSetEventCollectionMode(m_context,
                                            CUPTI_EVENT_COLLECTION_MODE_CONTINUOUS);
-    // CHECK_CUPTI_ERROR(cuptiErr, "cuptiSetEventCollectionMode");
+    CHECK_CUPTI_ERROR(cuptiErr, "cuptiSetEventCollectionMode");
     cuptiErr = cuptiEventGroupCreate(m_context, &eventGroup, 0);
-    // CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGroupCreate");
+    CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGroupCreate");
     cuptiErr = cuptiEventGetIdFromName(m_device, m_eventName0, &eventId0);
-    // CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGetIdFromName");
+    CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGetIdFromName");
     cuptiErr = cuptiEventGroupAddEvent(eventGroup, eventId0);
-    // CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGroupAddEvent");
+    CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGroupAddEvent");
     cuptiErr = cuptiEventGetIdFromName(m_device, m_eventName1, &eventId1);
-    // CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGetIdFromName");
+    CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGetIdFromName");
     cuptiErr = cuptiEventGroupAddEvent(eventGroup, eventId1);
-    // CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGroupAddEvent");
+    CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGroupAddEvent");
     cuptiErr = cuptiEventGroupSetAttribute(eventGroup,
                                            CUPTI_EVENT_GROUP_ATTR_PROFILE_ALL_DOMAIN_INSTANCES,
                                            sizeof(profile_all), &profile_all);
-    // CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGroupSetAttribute");
+    CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGroupSetAttribute");
     cuptiErr = cuptiEventGroupEnable(eventGroup);
-    // CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGroupEnable");
+    CHECK_CUPTI_ERROR(cuptiErr, "cuptiEventGroupEnable");
 
     valueSize = sizeof(numInstances);
     cuptiErr = cuptiEventGroupGetAttribute(eventGroup,
@@ -351,6 +357,7 @@ void MemoryProfiler::profileMemory()
     cudaMemset(flush_ptr, 0, flush_size * sizeof(float));
     cudaStream_t m_stream;
     cudaStreamCreate(&m_stream);
+    printf("Launching kernel with grid %d x %d to get %d assignments over %d instances and a flush size of %d\n", m_blocksPerGrid.x, m_threadsPerBlock.x, m_numAssignments, numInstances, flush_size);
     memProfile<<<m_blocksPerGrid, m_threadsPerBlock, 0, m_stream>>>(m_ptr, m_numAssignments, shStatus, shOffset, flush_ptr, flush_size);
     sampling_func(NULL);
 

@@ -261,7 +261,7 @@ ALL_LDFLAGS += $(addprefix -Xlinker ,$(LDFLAGS))
 ALL_LDFLAGS += $(addprefix -Xlinker ,$(EXTRA_LDFLAGS))
 
 # Common includes and paths for CUDA
-INCLUDES  := -I/usr/local/cuda/samples/common/inc -I.
+INCLUDES  := -I/usr/local/cuda/samples/common/inc -I. -I../samples/common/inc
 LIBRARIES := -lpthread -lcuda
 
 # Extra includes and paths for CUPTI
@@ -272,7 +272,7 @@ EXTRA_LIBRARIES := -L /usr/local/cuda/extras/CUPTI/lib -L /usr/local/cuda/extras
 ################################################################################
 
 # Gencode arguments
-SMS ?= 35 37 50 52 60 61 70 75 
+SMS ?= 50 52 60 61 
 # 80
 
 ifeq ($(SMS),)
@@ -302,7 +302,9 @@ cusrc = $(wildcard tasks/*.cu) \
         $(wildcard vectorAdd/*.cu) \
         $(wildcard memBench/*.cu) \
         $(wildcard dummy/*.cu) \
-#        $(wildcard BlackScholes/*.cu) \
+        $(wildcard matrixMul/*.cu) \
+        $(wildcard BlackScholes/*.cu) \
+        $(wildcard PathFinder/*.cu) \
 
 
 cppsrc =    $(wildcard tasks/*.cpp) \
@@ -315,7 +317,7 @@ dep = $(objs:.o=.d)
 # Target rules
 all: build
 
-build: ccke
+build: ccke soloTest concTest soloBench mpsBench example
 
 check.deps:
 # ifeq ($(SAMPLE_ENABLED),0)
@@ -333,12 +335,28 @@ check.deps:
 ccke: ckeTest.o $(objs)
 	$(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES) $(EXTRA_LIBRARIES)
 
+soloTest: soloTest.o $(objs)
+	        $(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES) $(EXTRA_LIBRARIES)
+
+concTest: concTest.o $(objs)
+	        $(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES) $(EXTRA_LIBRARIES)
+
+soloBench: soloBench.o $(objs)
+	        $(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES) $(EXTRA_LIBRARIES)
+
+mpsBench: mpsBench.o $(objs)
+	        $(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES) $(EXTRA_LIBRARIES)
+
+example: example.o $(objs)
+	        $(EXEC) $(NVCC) $(ALL_LDFLAGS) $(GENCODE_FLAGS) -o $@ $+ $(LIBRARIES) $(EXTRA_LIBRARIES)
+
 -include $(dep)
 
 run: build
 	$(EXEC) ./fccke
 
 clean:
-	rm -f fccke ckeTest.o $(objs)
+	rm -f fccke soloTest.o concTest.o soloBench.o ckeTest.o mpsBench.o $(objs)
+
 
 clobber: clean

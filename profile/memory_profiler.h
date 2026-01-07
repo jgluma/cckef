@@ -71,7 +71,7 @@
         cuptiGetResultString(err, &errstr);                     \
         printf("%s:%d:Error %s for CUPTI API function '%s'.\n", \
                __FILE__, __LINE__, errstr, cuptifunc);          \
-        return 0;                                               \
+        exit(-1);                                               \
     }
 
 #define ALIGN_SIZE (8)

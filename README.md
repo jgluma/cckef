@@ -83,3 +83,17 @@ If you find this code useful in your research, please consider citing:
 	doi = {10.1007/s11227-021-03819-z},
 }
 ```
+
+## 📈Traffic stats:
+
+This section displays the accumulated historical data for views and clones, updated daily to bypass GitHub's 14-day retention limit:
+
+| Total Views | Unique Visitors |
+| :---: | :---: |
+| ![Vistas](https://raw.githubusercontent.com/USUARIO/REPO/traffic/plots/views/total.svg) | ![Únicos](https://raw.githubusercontent.com/USUARIO/REPO/traffic/plots/views/uniques.svg) |
+
+| Total Clones | Unique Cloners |
+| :---: | :---: |
+| ![Clones](https://raw.githubusercontent.com/USUARIO/REPO/traffic/plots/clones/total.svg) | ![Únicos](https://raw.githubusercontent.com/USUARIO/REPO/traffic/plots/clones/uniques.svg) |
+
+> *Data automatically updated every 24 hours via GitHub Actions.*

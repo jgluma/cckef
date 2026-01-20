@@ -90,7 +90,8 @@ This section displays the accumulated historical data for views and clones, upda
 
 | Total Views | Unique Visitors |
 | :---: | :---: |
-| ![Vistas](https://raw.githubusercontent.com/USUARIO/REPO/traffic/plots/views/total.svg) | ![Únicos](https://raw.githubusercontent.com/USUARIO/REPO/traffic/plots/views/uniques.svg) |
+| ![Views](https://img.shields.io/badge/dynamic/json?color=blue&label=views&query=count&url=https%3A%2F%2Fraw.githubusercontent.com%2FUSUARIO%2FREPO%2Fmain%2Fstats%2Fviews.json) |
+| ![Unique](https://img.shields.io/badge/dynamic/json?color=green&label=unique%20visitors&query=uniques&url=https%3A%2F%2Fraw.githubusercontent.com%2FUSUARIO%2FREPO%2Fmain%2Fstats%2Fviews.json) 
 
 | Total Clones | Unique Cloners |
 | :---: | :---: |

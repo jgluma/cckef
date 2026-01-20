@@ -88,13 +88,11 @@ If you find this code useful in your research, please consider citing:
 
 This section displays the accumulated historical data for views and clones, updated daily to bypass GitHub's 14-day retention limit:
 
-| Total Views | Unique Visitors |
-| :---: | :---: |
-| ![Views](https://img.shields.io/badge/dynamic/json?color=blue&label=views&query=count&url=https%3A%2F%2Fraw.githubusercontent.com%2FUSUARIO%2FREPO%2Fmain%2Fstats%2Fviews.json) |
-| ![Unique](https://img.shields.io/badge/dynamic/json?color=green&label=unique%20visitors&query=uniques&url=https%3A%2F%2Fraw.githubusercontent.com%2FUSUARIO%2FREPO%2Fmain%2Fstats%2Fviews.json) 
+Metric | Status |
+| :--- | :--- |
+| **Total Views** | ![Views](https://img.shields.io/badge/dynamic/json?color=blue&label=views&query=count&url=https%3A%2F%2Fraw.githubusercontent.com%2Fjgluma%2Fcckef%2Fmain%2Fstats%2Fviews.json) |
+| **Unique Visitors** | ![Unique Views](https://img.shields.io/badge/dynamic/json?color=brightgreen&label=unique%20visitors&query=uniques&url=https%3A%2F%2Fraw.githubusercontent.com%2Fjgluma%2Fcckef%2Fmain%2Fstats%2Fviews.json) |
+| **Total Clones** | ![Clones](https://img.shields.io/badge/dynamic/json?color=orange&label=clones&query=count&url=https%3A%2F%2Fraw.githubusercontent.com%2Fjgluma%2Fcckef%2Fmain%2Fstats%2Fclones.json) |
+| **Unique Cloners** | ![Unique Clones](https://img.shields.io/badge/dynamic/json?color=yellow&label=unique%20cloners&query=uniques&url=https%3A%2F%2Fraw.githubusercontent.com%2Fjgluma%2Fcckef%2Fmain%2Fstats%2Fclones.json) |
 
-| Total Clones | Unique Cloners |
-| :---: | :---: |
-| ![Clones](https://raw.githubusercontent.com/USUARIO/REPO/traffic/plots/clones/total.svg) | ![Únicos](https://raw.githubusercontent.com/USUARIO/REPO/traffic/plots/clones/uniques.svg) |
-
-> *Data automatically updated every 24 hours via GitHub Actions.*
+> *Data automatically updated every 24 hours via GitHub Actions. Historical logs stored in `/stats`.*

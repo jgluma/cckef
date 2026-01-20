@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Actualizar Estadísticas de Tráfico
-        uses: teoxoy/profile-repository-stats@v1
+        uses: profile-summary/profile-repository-stats@v2.2
         with:
           token: ${{ secrets.TRAFFIC_TOKEN }}
           # Esto creará una rama llamada 'traffic' para guardar los datos
